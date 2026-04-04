@@ -145,13 +145,26 @@ jobs:
             # ── Pull the exact image built in stage 2 ────────────────────
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }}
 
+            # ── Ensure db and redis are up before starting the app ────────
+            docker compose -f docker-compose.1gb.yml up -d db redis
+
+            # ── Wait for db to be healthy before bringing up the app ──────
+            echo "Waiting for database to be ready..."
+            for i in $(seq 1 20); do
+              if docker compose -f docker-compose.1gb.yml exec -T db pg_isready -U postgres -q; then
+                echo "Database ready."
+                break
+              fi
+              sleep 3
+            done
+
             # ── Rolling restart: only app restarts, DB/Redis keep running ─
             docker compose -f docker-compose.1gb.yml up -d --no-deps app
 
             # ── Health check (retry for up to 60 s) ──────────────────────
             echo "Waiting for app to become healthy..."
             for i in $(seq 1 12); do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health || true)
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80/health || true)
               if [ "$STATUS" = "200" ]; then
                 echo "Health check passed (attempt $i)"
                 break
