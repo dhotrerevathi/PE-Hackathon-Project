@@ -145,35 +145,26 @@ jobs:
             # ── Pull the exact image built in stage 2 ────────────────────
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }}
 
-            # ── Ensure db and redis are up before starting the app ────────
-            docker compose -f docker-compose.1gb.yml up -d db redis
+            # ── Start all services (nginx, app, db, redis) ───────────────
+            # 'up -d' is idempotent: running containers are left untouched,
+            # only the app is recreated because its image changed.
+            docker compose -f docker-compose.1gb.yml up -d
 
-            # ── Wait for db to be healthy before bringing up the app ──────
-            echo "Waiting for database to be ready..."
-            for i in $(seq 1 20); do
-              if docker compose -f docker-compose.1gb.yml exec -T db pg_isready -U postgres -q; then
-                echo "Database ready."
-                break
-              fi
-              sleep 3
-            done
-
-            # ── Rolling restart: only app restarts, DB/Redis keep running ─
-            docker compose -f docker-compose.1gb.yml up -d --no-deps app
-
-            # ── Health check (retry for up to 60 s) ──────────────────────
+            # ── Health check — port 5000 (app direct, no nginx needed) ────
+            # Allow up to 3 minutes: first deploy seeds DB with Faker which
+            # takes ~60s on a 1vCPU droplet.
             echo "Waiting for app to become healthy..."
-            for i in $(seq 1 12); do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80/health || true)
+            for i in $(seq 1 36); do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health || true)
               if [ "$STATUS" = "200" ]; then
                 echo "Health check passed (attempt $i)"
                 break
               fi
               echo "Attempt $i: status=$STATUS, retrying..."
               sleep 5
-              if [ "$i" = "12" ]; then
-                echo "Health check failed after 60s. Rolling back..."
-                docker compose -f docker-compose.1gb.yml rollout app || true
+              if [ "$i" = "36" ]; then
+                echo "Health check failed after 3 minutes."
+                docker compose -f docker-compose.1gb.yml logs --tail=50 app
                 exit 1
               fi
             done
