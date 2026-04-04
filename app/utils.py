@@ -12,9 +12,7 @@ Character set: 0-9 (0-9), a-z (10-35), A-Z (36-61)  →  62 possible chars
 CHARSET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 # Paths that must never be usable as short codes
-RESERVED = {
-    "urls", "users", "api", "health", "static", "favicon.ico", "robots.txt"
-}
+RESERVED = {"urls", "users", "api", "health", "static", "favicon.ico", "robots.txt"}
 
 
 def to_base62(n: int) -> str:
@@ -34,9 +32,9 @@ def is_valid_custom_code(code: str) -> tuple[bool, str]:
         return False, "Code cannot be empty"
     if len(code) > 20:
         return False, "Code must be 20 characters or fewer"
+    if code.lower() in RESERVED:
+        return False, f'"{code}" is a reserved path'
     allowed = set(CHARSET + "-_")
     if not all(c in allowed for c in code):
         return False, "Code may only contain letters, numbers, hyphens, and underscores"
-    if code.lower() in RESERVED:
-        return False, f'"{code}" is a reserved path'
     return True, ""
