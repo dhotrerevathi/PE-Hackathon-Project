@@ -105,7 +105,7 @@ jobs:
         with:
           host:     ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USER }}
-          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.DROPLET_PASSWORD }}
           script: |
             set -euo pipefail
 
