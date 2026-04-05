@@ -21,8 +21,8 @@ def _event_to_dict(event):
 
     return {
         "id": event.id,
-        "url_id": event.url_id,
-        "user_id": event.user_id,
+        "url_id": event.url_id if event.url_id else None,
+        "user_id": event.user_id if event.user_id else None,
         "event_type": event.event_type,
         "timestamp": event.timestamp.isoformat() if event.timestamp else None,
         "details": details,
@@ -101,7 +101,7 @@ def create_event():
         details_str = json.dumps(details)
 
     event = Event.create(
-        url_id=url_id,
+        url=url,
         user_id=user_id,
         event_type=event_type,
         timestamp=datetime.utcnow(),
