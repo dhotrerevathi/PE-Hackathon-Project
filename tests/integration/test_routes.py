@@ -25,6 +25,17 @@ class TestHealth:
         body = client.get("/health").get_json()
         assert body["checks"]["db_primary"] == "ok"
 
+    def test_health_cache_check_present(self, client):
+        body = client.get("/health").get_json()
+        assert "cache" in body["checks"]
+        # In CI (no Redis) falls back to simplecache; in prod it reports 'redis'
+        assert body["checks"]["cache"] in ("redis", "simplecache")
+
+    def test_response_has_app_instance_header(self, client):
+        r = client.get("/health")
+        assert "X-App-Instance" in r.headers
+        assert len(r.headers["X-App-Instance"]) > 0
+
 
 # ── URL API (JSON) ────────────────────────────────────────────────────────────
 
