@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify
+from werkzeug.exceptions import HTTPException
 
 from app.cache import init_cache
 from app.database import db, init_db
@@ -20,6 +21,16 @@ def create_app():
     from app import models  # noqa: F401 - registers models with Peewee
 
     register_routes(app)
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(e):
+        """Catches 400 Bad Request (malformed JSON) and returns clean JSON."""
+        return jsonify({"error": e.name, "message": e.description}), e.code
+
+    @app.errorhandler(Exception)
+    def handle_generic_exception(e):
+        """Prevents the app from leaking raw 500 HTML traces."""
+        return jsonify({"error": "Internal Server Error", "message": "An unexpected error occurred"}), 500
 
     @app.route("/health")
     def health():
