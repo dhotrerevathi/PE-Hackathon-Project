@@ -11,14 +11,14 @@ alerting:
   alertmanagers:
     - static_configs:
         - targets:
-            - localhost:9093
+            - alertmanager:9093
 
 # ── Scrape targets ────────────────────────────────────────────────────────────
 scrape_configs:
   - job_name: flask-app
     static_configs:
       - targets:
-          - 172.17.0.1:5000   # Docker host IP — reaches the app container
+          - app:5000   # Uses Docker internal network to reach the app directly
 
   - job_name: node
     static_configs:

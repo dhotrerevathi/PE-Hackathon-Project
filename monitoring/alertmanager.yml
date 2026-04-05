@@ -22,7 +22,8 @@ route:
 receivers:
   - name: discord
     discord_configs:
-      - webhook_url: "${DISCORD_WEBHOOK_URL}"
+      # Replace with your ACTUAL Discord URL. Alertmanager does not read env vars here!
+      - webhook_url: "https://discord.com/api/webhooks/1490001267970277477/DVMBs_rYuI8uoNGNgRQVs8PGPBMj4crR0CU9D4fqTCr5ZYHE_Gl81ypx3I1lfeeB_vVM"
         # Embed colour: red for critical, orange for warning
         title: >-
           {{ if eq (index .Alerts 0).Labels.severity "critical" }}🔴{{ else }}🟡{{ end }}
