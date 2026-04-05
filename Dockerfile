@@ -16,7 +16,8 @@ RUN uv pip install --system --no-cache \
     "psycopg2>=2.9" \
     "python-dotenv>=1.0" \
     "redis>=5.0" \
-    "faker>=33.0"
+    "faker>=33.0" \
+    "prometheus-flask-exporter>=0.23" 
 
 COPY . .
 

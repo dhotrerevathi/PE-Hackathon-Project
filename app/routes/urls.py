@@ -9,6 +9,14 @@ from app.models.event import Event
 from app.models.url import Url
 from app.utils import is_valid_custom_code, to_base62
 
+from prometheus_client import Counter
+
+redirect_counter = Counter(
+    'url_redirects_total',
+    'Total URL redirections by short code',
+    ['short_code']
+)
+
 urls_bp = Blueprint("urls", __name__)
 
 
@@ -47,6 +55,8 @@ def redirect_url(short_code):
     # The Slumbering Guide: inactive URL returns 404 and logs NO event.
     if not target["is_active"]:
         return jsonify(error="URL is inactive"), 404
+    
+    redirect_counter.labels(short_code=short_code).inc()
 
     Event.create(
         url_id=target["id"],
