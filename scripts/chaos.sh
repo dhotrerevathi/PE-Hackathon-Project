@@ -25,6 +25,7 @@ BASE_URL="${BASE_URL:-http://localhost}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.1gb.yml}"
 HEALTH_ENDPOINT="${BASE_URL}/health"
 MAX_WAIT=60   # seconds before giving up on recovery
+DISCORD_WEBHOOK="${DISCORD_WEBHOOK:-https://discord.com/api/webhooks/1490001267970277477/DVMBs_rYuI8uoNGNgRQVs8PGPBMj4crR0CU9D4fqTCr5ZYHE_Gl81ypx3I1lfeeB_vVM}"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 ts()  { date '+%H:%M:%S'; }
@@ -37,6 +38,24 @@ health_status() {
   curl -s --max-time 3 "$HEALTH_ENDPOINT" 2>/dev/null \
     | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','?'))" \
     2>/dev/null || echo "down"
+}
+
+_discord_send() {
+    [ -z "$DISCORD_WEBHOOK" ] && return 0
+    local title="$1" color="$2" description="$3"
+    local timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    local payload=$(cat << EOF
+{
+  "embeds": [{
+    "title": "${title}",
+    "description": "${description}",
+    "color": ${color},
+    "timestamp": "${timestamp}"
+  }]
+}
+EOF
+)
+    curl -s -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK" > /dev/null
 }
 
 # ── Pre-flight ────────────────────────────────────────────────────────────────
@@ -79,6 +98,7 @@ printf "Running: ${BOLD}docker kill %s${RESET}\n\n" "$APP_CONTAINER"
 KILL_TIME=$(ts)
 docker kill "$APP_CONTAINER" > /dev/null
 printf "${RED}${BOLD}💀 Container killed at %s${RESET}\n" "$KILL_TIME"
+_discord_send "💀 Chaos Demo — Container Killed" 15158332 "The app container \`${APP_CONTAINER}\` was forcefully killed via SIGKILL. Docker auto-recovery is stepping in."
 
 # Brief pause to let Docker notice the exit
 sleep 1
@@ -130,6 +150,7 @@ if [ "$RECOVERED" = "true" ]; then
 
   echo ""
   printf "${BOLD}${GREEN}✓ Chaos test passed.${RESET}\n"
+  _discord_send "✅ Chaos Demo — Service Recovered" 3066993 "Service fully recovered in **${TOTAL_TIME} seconds**. New container ID: \`${NEW_CONTAINER}\`."
   printf "${DIM}The 'restart: unless-stopped' policy in docker-compose.1gb.yml\n"
   printf "automatically recreated the container without any manual intervention.${RESET}\n"
 else
@@ -140,5 +161,6 @@ else
   echo ""
   printf "${DIM}Recent logs:${RESET}\n"
   docker compose -f "$COMPOSE_FILE" logs --tail=20 app
+  _discord_send "❌ Chaos Demo — Recovery Failed" 15158332 "Service did NOT recover within ${MAX_WAIT} seconds."
   exit 1
 fi
