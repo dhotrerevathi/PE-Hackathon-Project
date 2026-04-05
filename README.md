@@ -2,6 +2,8 @@
 
 A production-grade URL shortener built for the MLH PE Hackathon 2026.
 
+Base URL: http://159.203.3.94/
+
 **Stack:** Flask · Peewee ORM · PostgreSQL · Redis · Gunicorn · Nginx · Docker
 
 ---
