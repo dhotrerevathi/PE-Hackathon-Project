@@ -14,7 +14,9 @@ from app.models.user import User
 def create_dummy_user():
     user = User.get_or_none(User.username == "dummy")
     if not user:
-        user = User.create(username="dummy", email="dummy@example.com", created_at=datetime.utcnow())
+        user = User.create(
+            username="dummy", email="dummy@example.com", created_at=datetime.utcnow()
+        )
     return user.id
 
 
@@ -41,7 +43,10 @@ class TestHealthDetailed:
 
 class TestUrlListFilters:
     def _create(self, client, url, **kwargs):
-        return client.post("/urls", json={"original_url": url, "user_id": create_dummy_user(), **kwargs})
+        return client.post(
+            "/urls",
+            json={"original_url": url, "user_id": create_dummy_user(), **kwargs},
+        )
 
     def test_active_filter_true(self, client):
         self._create(client, "https://active.example.com")
@@ -86,7 +91,11 @@ class TestUrlCrudEdgeCases:
 
     def test_update_original_url(self, client):
         url_id = client.post(
-            "/urls", json={"original_url": "https://before.example.com", "user_id": create_dummy_user()}
+            "/urls",
+            json={
+                "original_url": "https://before.example.com",
+                "user_id": create_dummy_user(),
+            },
         ).get_json()["id"]
         r = client.put(
             f"/urls/{url_id}", json={"original_url": "https://after.example.com"}
@@ -99,7 +108,7 @@ class TestUrlCrudEdgeCases:
             json={
                 "original_url": "https://example.com",
                 "short_code": "a" * 21,
-                "user_id": create_dummy_user()
+                "user_id": create_dummy_user(),
             },
         )
         assert r.status_code == 400
@@ -110,7 +119,7 @@ class TestUrlCrudEdgeCases:
             json={
                 "original_url": "https://example.com",
                 "short_code": "bad code!",
-                "user_id": create_dummy_user()
+                "user_id": create_dummy_user(),
             },
         )
         assert r.status_code == 400
@@ -136,14 +145,18 @@ class TestUrlCrudEdgeCases:
             json={
                 "original_url": "https://titled.example.com",
                 "title": "My Title",
-                "user_id": create_dummy_user()
+                "user_id": create_dummy_user(),
             },
         )
         assert r.get_json()["title"] == "My Title"
 
     def test_url_stats_zero_clicks(self, client):
         url_id = client.post(
-            "/urls", json={"original_url": "https://noclicks.example.com", "user_id": create_dummy_user()}
+            "/urls",
+            json={
+                "original_url": "https://noclicks.example.com",
+                "user_id": create_dummy_user(),
+            },
         ).get_json()["id"]
         r = client.get(f"/urls/{url_id}/stats")
         assert r.get_json()["clicks"] == 0
@@ -155,14 +168,23 @@ class TestUrlCrudEdgeCases:
 
 class TestStatsDetailed:
     def test_total_events_counted(self, client):
-        r = client.post("/urls", json={"original_url": "https://ev.example.com", "user_id": create_dummy_user()})
+        r = client.post(
+            "/urls",
+            json={"original_url": "https://ev.example.com", "user_id": create_dummy_user()},
+        )
         code = r.get_json()["short_code"]
         client.get(f"/{code}")
         body = client.get("/stats").get_json()
         assert body["total_events"] >= 2  # created + click
 
     def test_total_clicks_matches_redirects(self, client):
-        r = client.post("/urls", json={"original_url": "https://clk.example.com", "user_id": create_dummy_user()})
+        r = client.post(
+            "/urls",
+            json={
+                "original_url": "https://clk.example.com",
+                "user_id": create_dummy_user(),
+            },
+        )
         code = r.get_json()["short_code"]
         client.get(f"/{code}")
         client.get(f"/{code}")
@@ -170,7 +192,13 @@ class TestStatsDetailed:
         assert body["total_clicks"] == 2
 
     def test_top_urls_in_stats(self, client):
-        r = client.post("/urls", json={"original_url": "https://top.example.com", "user_id": create_dummy_user()})
+        r = client.post(
+            "/urls",
+            json={
+                "original_url": "https://top.example.com",
+                "user_id": create_dummy_user(),
+            },
+        )
         code = r.get_json()["short_code"]
         for _ in range(3):
             client.get(f"/{code}")

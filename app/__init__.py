@@ -30,7 +30,15 @@ def create_app():
     @app.errorhandler(Exception)
     def handle_generic_exception(e):
         """Prevents the app from leaking raw 500 HTML traces."""
-        return jsonify({"error": "Internal Server Error", "message": "An unexpected error occurred"}), 500
+        return (
+            jsonify(
+                {
+                    "error": "Internal Server Error",
+                    "message": "An unexpected error occurred",
+                }
+            ),
+            500,
+        )
 
     @app.route("/health")
     def health():

@@ -66,25 +66,27 @@ def bulk_load_users():
     file = request.files["file"]
     if file.filename == "":
         return jsonify(error="No selected file"), 400
-        
+
     try:
         stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
         reader = csv.DictReader(stream)
         rows = list(reader)
-        
+
         data = []
         for r in rows:
-            data.append({
-                "id": int(r["id"]) if r.get("id") else None,
-                "username": r["username"],
-                "email": r["email"],
-                "created_at": r.get("created_at") or datetime.utcnow().isoformat(),
-            })
-            
+            data.append(
+                {
+                    "id": int(r["id"]) if r.get("id") else None,
+                    "username": r["username"],
+                    "email": r["email"],
+                    "created_at": r.get("created_at") or datetime.utcnow().isoformat(),
+                }
+            )
+
         with db.atomic():
             for batch in chunked(data, 100):
                 User.insert_many(batch).execute()
-                
+
         return jsonify(count=len(data)), 201
     except Exception as e:
         return jsonify(error=str(e)), 400

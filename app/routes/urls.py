@@ -32,7 +32,12 @@ def _get_redirect_target(short_code):
     url = Url.get_or_none(Url.short_code == short_code)
     if url is None:
         return None
-    return {"id": url.id, "original_url": url.original_url, "user_id": url.user_id, "is_active": url.is_active}
+    return {
+        "id": url.id,
+        "original_url": url.original_url,
+        "user_id": url.user_id,
+        "is_active": url.is_active,
+    }
 
 
 @urls_bp.route("/<short_code>")
