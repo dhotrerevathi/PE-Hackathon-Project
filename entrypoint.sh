@@ -26,8 +26,8 @@ print("Database not ready after 60 seconds, exiting.")
 sys.exit(1)
 EOF
 
-echo "Seeding database..."
-python -c "from app.seed import seed_all; seed_all()"
+# echo "Seeding database..."
+# python -c "from app.seed import seed_all; seed_all()"
 
 echo "Starting application with Gunicorn..."
 exec gunicorn \
