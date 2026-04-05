@@ -148,39 +148,58 @@ def delete_user(user_id):
 @users_bp.route("/api/users/bulk", methods=["POST"])
 @users_bp.route("/users/bulk", methods=["POST"])
 def bulk_create_users():
-    """Bulk import users from a CSV file (multipart/form-data, field: file)."""
-    if "file" not in request.files:
-        return jsonify(error="multipart field 'file' is required"), 400
+    """Bulk import users from a CSV file (multipart/form-data or JSON payload)."""
+    content = None
 
-    file = request.files["file"]
-    if not file.filename:
-        return jsonify(error="No file selected"), 400
+    # 1. Check if the payload is JSON referencing a local file
+    data = request.get_json(silent=True)
+    if isinstance(data, dict) and "file" in data and isinstance(data["file"], str):
+        try:
+            with open(data["file"], "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception as e:
+            return jsonify(error=f"Could not read local file: {e}"), 400
 
+    # 2. Fall back to reading multipart/form-data upload
+    if content is None:
+        try:
+            if "file" not in request.files:
+                return jsonify(error="multipart field 'file' is required or valid JSON"), 400
+            file = request.files["file"]
+            if not file.filename:
+                return jsonify(error="No file selected"), 400
+            content = file.read().decode("utf-8")
+        except Exception as e:
+            return jsonify(error=f"Error reading file upload: {e}"), 400
+
+    # 3. Parse the CSV content safely
     try:
-        content = file.read().decode("utf-8")
-    except Exception:
-        return jsonify(error="Could not decode file as UTF-8"), 400
-
-    reader = csv.DictReader(io.StringIO(content))
-    if reader.fieldnames is None or not {"username", "email"}.issubset(
-        {f.strip() for f in reader.fieldnames}
-    ):
-        return jsonify(error="CSV must have 'username' and 'email' columns"), 400
+        reader = csv.DictReader(io.StringIO(content))
+        if reader.fieldnames is None:
+            return jsonify(error="CSV file is empty"), 400
+        fieldnames = {f.strip() for f in reader.fieldnames if f}
+        if not {"username", "email"}.issubset(fieldnames):
+            return jsonify(error="CSV must have 'username' and 'email' columns"), 400
+    except Exception as e:
+        return jsonify(error=f"Invalid CSV format: {e}"), 400
 
     imported = []
     now = datetime.utcnow()
-    with db.atomic():
-        for row in reader:
-            username = (row.get("username") or "").strip()
-            email = (row.get("email") or "").strip()
-            if not username or not email or not _EMAIL_RE.match(email):
-                continue
-            if (
-                User.select().where(User.username == username).exists()
-                or User.select().where(User.email == email).exists()
-            ):
-                continue
-            user = User.create(username=username, email=email, created_at=now)
-            imported.append(_user_to_dict(user))
+    try:
+        with db.atomic():
+            for row in reader:
+                username = (row.get("username") or "").strip()
+                email = (row.get("email") or "").strip()
+                if not username or not email or not _EMAIL_RE.match(email):
+                    continue
+                if (
+                    User.select().where(User.username == username).exists()
+                    or User.select().where(User.email == email).exists()
+                ):
+                    continue
+                user = User.create(username=username, email=email, created_at=now)
+                imported.append(_user_to_dict(user))
+    except Exception as e:
+        return jsonify(error="Database error during import", message=str(e)), 400
 
     return jsonify(count=len(imported), imported=imported), 201
