@@ -1,0 +1,48 @@
+global:
+  # How long to wait before re-sending an alert that is still firing.
+  resolve_timeout: 5m
+
+# ── Routing ──────────────────────────────────────────────────────────────────
+route:
+  receiver: discord
+  group_by: [alertname, severity]
+  group_wait: 30s        # batch alerts for 30 s before first notification
+  group_interval: 5m     # wait 5 m before sending a new batch for the same group
+  repeat_interval: 1h    # re-notify after 1 h if alert is still firing
+
+  routes:
+    # Critical alerts: immediate, no batching
+    - matchers:
+        - severity="critical"
+      receiver: discord
+      group_wait: 0s
+      repeat_interval: 15m
+
+# ── Receivers ────────────────────────────────────────────────────────────────
+receivers:
+  - name: discord
+    discord_configs:
+      - webhook_url: "${DISCORD_WEBHOOK_URL}"
+        # Embed colour: red for critical, orange for warning
+        title: >-
+          {{ if eq (index .Alerts 0).Labels.severity "critical" }}🔴{{ else }}🟡{{ end }}
+          {{ .CommonAnnotations.summary }}
+        message: |
+          **Alert:** {{ .CommonAnnotations.summary }}
+          **Severity:** {{ (index .Alerts 0).Labels.severity | title }}
+          **Status:** {{ .Status | title }}
+          {{ range .Alerts }}
+          **Details:** {{ .Annotations.description }}
+          **Started:** {{ .StartsAt | since }}
+          {{ end }}
+          [View in Grafana](http://159.203.3.94/grafana/d/golden-signals/golden-signals)
+
+# ── Inhibition ───────────────────────────────────────────────────────────────
+inhibit_rules:
+  # Suppress warning-level alerts when a critical is already firing for the
+  # same instance — avoids alert storms when the app is completely down.
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal: [job]

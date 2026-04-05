@@ -1,11 +1,26 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
 
+# ── Alert rules ──────────────────────────────────────────────────────────────
+rule_files:
+  - "/etc/prometheus/alert_rules.yml"
+
+# ── Alertmanager ─────────────────────────────────────────────────────────────
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - localhost:9093
+
+# ── Scrape targets ────────────────────────────────────────────────────────────
 scrape_configs:
-  - job_name: 'flask-app'
+  - job_name: flask-app
     static_configs:
-      - targets: ['172.17.0.1:5000']  
+      - targets:
+          - 172.17.0.1:5000   # Docker host IP — reaches the app container
 
-  - job_name: 'node'
+  - job_name: node
     static_configs:
-      - targets: ['localhost:9100']  
+      - targets:
+          - localhost:9100    # Node Exporter: OS-level CPU/memory/disk

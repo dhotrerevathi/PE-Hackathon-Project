@@ -2,6 +2,8 @@
 
 Runbooks are step-by-step procedures for responding to specific alerts or incidents. Each runbook includes: trigger condition, severity, impact, diagnostic steps, resolution steps, and escalation path.
 
+**Grafana dashboard:** http://159.203.3.94/grafana/d/golden-signals — open this first for any incident. The Quick Stats row shows live: App Status, RPS, p95 latency, error rate, and memory. Alert notifications are delivered to Discord via Alertmanager (see `monitoring/alertmanager.yml`).
+
 ---
 
 ## RB-01: App Container Crash Loop

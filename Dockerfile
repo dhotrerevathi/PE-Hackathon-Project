@@ -17,7 +17,8 @@ RUN uv pip install --system --no-cache \
     "python-dotenv>=1.0" \
     "redis>=5.0" \
     "faker>=33.0" \
-    "prometheus-flask-exporter>=0.23" 
+    "prometheus-flask-exporter>=0.23" \
+    "python-json-logger>=2.0"
 
 COPY . .
 

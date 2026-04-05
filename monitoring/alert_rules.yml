@@ -1,0 +1,67 @@
+groups:
+  - name: url_shortener
+    interval: 15s
+    rules:
+
+      # ── Availability ────────────────────────────────────────────────────────
+      - alert: InstanceDown
+        expr: up{job="flask-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Flask app is unreachable"
+          description: >
+            Prometheus cannot scrape the Flask /metrics endpoint.
+            The app container may be crashed or restarting.
+            Check: docker compose -f docker-compose.1gb.yml ps app
+
+      # ── Error rate ──────────────────────────────────────────────────────────
+      - alert: HighErrorRate
+        expr: >
+          (
+            rate(flask_http_request_total{status=~"5.."}[5m])
+            /
+            rate(flask_http_request_total[5m])
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Error rate above 5%"
+          description: >
+            More than 5% of requests are returning 5xx status codes.
+            Current rate: {{ $value | humanizePercentage }}.
+            Check: docker compose logs --tail=50 app
+
+      # ── Latency ─────────────────────────────────────────────────────────────
+      - alert: HighLatency
+        expr: >
+          histogram_quantile(0.95,
+            rate(flask_http_request_duration_seconds_bucket[5m])
+          ) > 3
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 latency above 3 seconds"
+          description: >
+            The 95th-percentile response time has exceeded 3 s for 3 minutes.
+            Current p95: {{ $value | humanizeDuration }}.
+            Possible causes: Redis down (falling back to DB), DB overloaded,
+            or insufficient Gunicorn workers.
+
+      # ── Saturation (memory) ─────────────────────────────────────────────────
+      - alert: HighMemoryUsage
+        expr: >
+          process_resident_memory_bytes{job="flask-app"}
+          > 180 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "App memory above 180 MB"
+          description: >
+            The Flask process RSS is {{ $value | humanize1024 }}B — approaching
+            the 200 MB container limit. Risk of OOM kill.
+            Action: docker compose -f docker-compose.1gb.yml restart app

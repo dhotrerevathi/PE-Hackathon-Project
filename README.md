@@ -66,7 +66,11 @@ A production-grade URL shortener built for the MLH PE Hackathon 2026.
 8. [Error Handling](#error-handling)
 9. [Failure Modes](#failure-modes)
 10. [Chaos Mode — Docker Restart Policy](#chaos-mode--docker-restart-policy)
-11. [Development Reference](#development-reference)
+11. [Incident Response Quest — Evidence](#incident-response-quest--evidence)
+    - [Bronze: Structured Logging + Metrics](#bronze-structured-logging--metrics-endpoint)
+    - [Silver: Alerts to Discord](#silver-alerts-to-discord)
+    - [Gold: Grafana Golden Signals Dashboard](#gold-grafana-golden-signals-dashboard)
+12. [Development Reference](#development-reference)
 
 ---
 
@@ -751,6 +755,83 @@ Results: 30 / 30 checks passed
 ### Failure Mode Documentation
 
 See [FAILURE_MODES.md](FAILURE_MODES.md) for the complete failure mode reference, covering all 12 failure scenarios with user impact, auto-recovery behaviour, and time-to-recover for each.
+
+---
+
+## Incident Response Quest — Evidence
+
+### Bronze: Structured Logging + Metrics Endpoint
+
+Every log line is emitted as machine-parseable JSON with `timestamp`, `level`, `method`, `path`, `status`, and `instance` fields:
+
+```json
+{"timestamp": "2026-01-15T14:23:01", "level": "INFO", "name": "app",
+ "message": "request", "method": "GET", "path": "/abc123",
+ "status": 302, "instance": "app_abc12"}
+```
+
+Errors include full stack traces under `exc_info`. The `/metrics` endpoint (exposed by `prometheus-flask-exporter`) is scraped by Prometheus every 15 seconds.
+
+**Key metrics collected:**
+
+| Metric | What it shows |
+|--------|--------------|
+| `flask_http_request_total` | Requests by method / path / HTTP status |
+| `flask_http_request_duration_seconds` | Response time histogram (p50/p95/p99) |
+| `process_resident_memory_bytes` | App container RSS memory |
+| `process_cpu_seconds_total` | CPU time consumed |
+
+### Silver: Alerts to Discord
+
+Alert rules are defined in [monitoring/alert_rules.yml](monitoring/alert_rules.yml). Alertmanager routes them to Discord via webhook ([monitoring/alertmanager.yml](monitoring/alertmanager.yml)).
+
+| Alert | Fires when | Severity |
+|-------|-----------|----------|
+| InstanceDown | App unreachable for 1 min | 🔴 Critical |
+| HighErrorRate | 5xx rate > 5% for 2 min | 🟡 Warning |
+| HighLatency | p95 > 3 s for 3 min | 🟡 Warning |
+| HighMemoryUsage | RSS > 180 MB for 5 min | 🟡 Warning |
+
+Critical alerts fire immediately; warnings are batched. When the service recovers, Alertmanager sends a resolved notification.
+
+Setup instructions: [monitoring/README.md](monitoring/README.md#silver--alerting-to-discord)
+
+### Gold: Grafana Golden Signals Dashboard
+
+Dashboard: **http://159.203.3.94/grafana/d/golden-signals**
+
+The dashboard tracks Google's Four Golden Signals across 14 panels:
+
+| Signal | What you see |
+|--------|-------------|
+| **Latency** | p50 + p95 overall; p95 breakdown by endpoint |
+| **Traffic** | Requests/sec by HTTP status; by endpoint |
+| **Errors** | 5xx gauge (red at 5%); 4xx/5xx trend over time |
+| **Saturation** | Memory gauge (red at 185 MB); CPU usage; open FDs |
+
+**Quick Stats row** shows live: App Status (UP/DOWN), RPS, p95, Error Rate, RSS.
+
+Dashboard JSON: [monitoring/dashboards/golden_signals.json](monitoring/dashboards/golden_signals.json)
+
+### Sherlock Mode — Reading the Dashboard
+
+**Scenario: InstanceDown alert fires**
+1. Quick Stats → App Status turns **red**
+2. `docker compose -f docker-compose.1gb.yml ps` → container `Restarting`?
+3. `docker compose logs --tail=50 app` → find the crash reason
+4. Follow [RB-01](docs/runbooks.md#rb-01-app-container-crash-loop)
+
+**Scenario: HighLatency alert fires**
+1. Latency by Endpoint → identify the slow path
+2. `curl http://localhost/health` → is `cache` = `"redis"` or `"simplecache"`?
+3. If `simplecache`: Redis fell back → follow [RB-04](docs/runbooks.md#rb-04-redis-down--cache-miss)
+4. If Redis OK: DB under pressure → follow [RB-03](docs/runbooks.md#rb-03-high-response-latency)
+
+**Scenario: HighErrorRate alert fires**
+1. Errors row → which endpoint is red?
+2. Filter logs: `docker compose logs app | grep '"level":"ERROR"'`
+3. Correlate with Latency panel — slow + errors = DB/Redis issue
+4. Follow [RB-02](docs/runbooks.md#rb-02-database-unreachable) or [RB-04](docs/runbooks.md#rb-04-redis-down--cache-miss)
 
 ---
 
