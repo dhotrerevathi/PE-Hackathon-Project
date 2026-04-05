@@ -1,10 +1,10 @@
+import json
 import logging
 import os
 import socket
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
-from pythonjsonlogger import jsonlogger
 from werkzeug.exceptions import HTTPException
 
 from app.cache import init_cache
@@ -16,21 +16,41 @@ from prometheus_flask_exporter import PrometheusMetrics
 _HOSTNAME = socket.gethostname()
 
 
-def _configure_logging():
-    """Replace the root logger handler with a JSON formatter.
+class _JsonFormatter(logging.Formatter):
+    """Zero-dependency JSON log formatter.
 
-    Every log record will include: timestamp, level, logger name, message,
-    plus any extra fields passed via the ``extra=`` kwarg (e.g. short_code,
-    user_id, status_code).  This makes logs machine-parseable by Loki /
-    CloudWatch / any JSON log aggregator.
+    Produces one JSON object per line with: timestamp, level, logger,
+    message, plus any extra fields supplied via ``extra=`` on log calls.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict = {
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        # Merge any ``extra={}`` fields the caller passed in
+        _reserved = logging.LogRecord.__dict__.keys() | {
+            "message", "asctime", "exc_info", "exc_text", "stack_info",
+            "msg", "args",
+        }
+        for key, val in record.__dict__.items():
+            if key not in _reserved and not key.startswith("_"):
+                payload[key] = val
+        if record.exc_info:
+            payload["exc_info"] = self.formatException(record.exc_info)
+        return json.dumps(payload)
+
+
+def _configure_logging() -> None:
+    """Replace the root logger handler with the JSON formatter.
+
+    Every log record will include: timestamp, level, logger, message,
+    plus any extra fields passed via ``extra=`` (e.g. method, path, status).
     """
     handler = logging.StreamHandler()
-    fmt = jsonlogger.JsonFormatter(
-        fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-        rename_fields={"asctime": "timestamp", "levelname": "level"},
-    )
-    handler.setFormatter(fmt)
+    handler.setFormatter(_JsonFormatter())
 
     root = logging.getLogger()
     root.handlers.clear()
