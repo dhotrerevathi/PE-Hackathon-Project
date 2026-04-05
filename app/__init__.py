@@ -108,9 +108,11 @@ def create_app():
             ),
             500,
         )
+    
     @app.route("/")
     def index():
         return jsonify(message="Hey! The URL Shortener API is running", version="1.0")
+    
     @app.route("/health")
     def health():
         checks = {}
