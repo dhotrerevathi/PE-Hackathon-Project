@@ -97,83 +97,92 @@ def get_user(user_id):
 @users_bp.route("/api/users", methods=["POST"])
 @users_bp.route("/users", methods=["POST"])
 def create_user():
-    # The Fractured Vessel: must be a JSON object
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return jsonify(error="Request body must be a JSON object"), 400
+    try:
+        # The Fractured Vessel: must be a JSON object
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify(error="Request body must be a JSON object"), 400
 
-    # The Unwitting Stranger: validate types and required fields
-    username = data.get("username")
-    email = data.get("email")
+        # The Unwitting Stranger: validate types and required fields
+        username = data.get("username")
+        email = data.get("email")
 
-    if not isinstance(username, str) or not username.strip():
-        return jsonify(error="username is required and must be a non-empty string"), 400
-    if not isinstance(email, str) or not email.strip():
-        return jsonify(error="email is required and must be a non-empty string"), 400
+        if not isinstance(username, str) or not username.strip():
+            return jsonify(error="username is required and must be a non-empty string"), 400
+        if not isinstance(email, str) or not email.strip():
+            return jsonify(error="email is required and must be a non-empty string"), 400
 
-    username = username.strip()
-    email = email.strip()
+        username = username.strip()
+        email = email.strip()
 
-    if not _EMAIL_RE.match(email):
-        return jsonify(error="email is invalid"), 400
+        if not _EMAIL_RE.match(email):
+            return jsonify(error="email is invalid"), 400
 
-    if User.select().where(User.username == username).exists():
-        return jsonify(error="username already taken"), 409
-    if User.select().where(User.email == email).exists():
-        return jsonify(error="email already registered"), 409
+        if User.select().where(User.username == username).exists():
+            return jsonify(error="username already taken"), 409
+        if User.select().where(User.email == email).exists():
+            return jsonify(error="email already registered"), 409
 
-    user = User.create(username=username, email=email, created_at=datetime.utcnow())
-    return jsonify(_user_to_dict(user)), 201
+        user = User.create(username=username, email=email, created_at=datetime.utcnow())
+        return jsonify(_user_to_dict(user)), 201
+    except Exception as e:
+        return jsonify(error=f"{type(e).__name__}: {str(e)}", message=str(e)), 500
 
 
 @users_bp.route("/api/users/<int:user_id>", methods=["PUT"])
 @users_bp.route("/users/<int:user_id>", methods=["PUT"])
 def update_user(user_id):
-    user = User.get_or_none(User.id == user_id)
-    if user is None:
-        return jsonify(error="User not found"), 404
+    try:
+        user = User.get_or_none(User.id == user_id)
+        if user is None:
+            return jsonify(error="User not found"), 404
 
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return jsonify(error="Request body must be a JSON object"), 400
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify(error="Request body must be a JSON object"), 400
 
-    if "username" in data:
-        username = data["username"]
-        if not isinstance(username, str) or not username.strip():
-            return jsonify(error="username must be a non-empty string"), 400
-        username = username.strip()
-        # Check for duplicate username (excluding current user)
-        existing = User.get_or_none(User.username == username)
-        if existing and existing.id != user.id:
-            return jsonify(error="username already taken"), 409
-        user.username = username
+        if "username" in data:
+            username = data["username"]
+            if not isinstance(username, str) or not username.strip():
+                return jsonify(error="username must be a non-empty string"), 400
+            username = username.strip()
+            # Check for duplicate username (excluding current user)
+            existing = User.get_or_none(User.username == username)
+            if existing and existing.id != user.id:
+                return jsonify(error="username already taken"), 409
+            user.username = username
 
-    if "email" in data:
-        email = data["email"]
-        if not isinstance(email, str) or not email.strip():
-            return jsonify(error="email must be a non-empty string"), 400
-        email = email.strip()
-        if not _EMAIL_RE.match(email):
-            return jsonify(error="email is invalid"), 400
-        # Check for duplicate email (excluding current user)
-        existing = User.get_or_none(User.email == email)
-        if existing and existing.id != user.id:
-            return jsonify(error="email already registered"), 409
-        user.email = email
+        if "email" in data:
+            email = data["email"]
+            if not isinstance(email, str) or not email.strip():
+                return jsonify(error="email must be a non-empty string"), 400
+            email = email.strip()
+            if not _EMAIL_RE.match(email):
+                return jsonify(error="email is invalid"), 400
+            # Check for duplicate email (excluding current user)
+            existing = User.get_or_none(User.email == email)
+            if existing and existing.id != user.id:
+                return jsonify(error="email already registered"), 409
+            user.email = email
 
-    user.save()
-    return jsonify(_user_to_dict(user))
+        user.save()
+        return jsonify(_user_to_dict(user))
+    except Exception as e:
+        return jsonify(error=f"{type(e).__name__}: {str(e)}", message=str(e)), 500
 
 
 @users_bp.route("/api/users/<int:user_id>", methods=["DELETE"])
 @users_bp.route("/users/<int:user_id>", methods=["DELETE"])
 def delete_user(user_id):
-    user = User.get_or_none(User.id == user_id)
-    if user is None:
-        return jsonify(error="User not found"), 404
+    try:
+        user = User.get_or_none(User.id == user_id)
+        if user is None:
+            return jsonify(error="User not found"), 404
 
-    user.delete_instance(recursive=True)
-    return jsonify(message="User deleted"), 200
+        user.delete_instance(recursive=True)
+        return jsonify(message="User deleted"), 200
+    except Exception as e:
+        return jsonify(error=f"{type(e).__name__}: {str(e)}", message=str(e)), 500
 
 
 @users_bp.route("/api/users/bulk", methods=["POST"])
