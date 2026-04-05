@@ -6,6 +6,48 @@ A production-grade URL shortener built for the MLH PE Hackathon 2026.
 
 ---
 
+## Architecture
+
+```
+                        ┌─────────────────────────────────────┐
+ Client / Browser  ────►│  Nginx  :80                         │
+                        │  least_conn · rate limit · gzip     │
+                        └───────────┬─────────────┬───────────┘
+                                    │             │  (scale-out)
+                        ┌───────────▼───┐   ┌─────▼───────────┐
+                        │  App  :5000   │   │  App  :5000      │
+                        │  Gunicorn ×2  │   │  Gunicorn ×2     │
+                        │  Flask+Peewee │   │  Flask+Peewee    │
+                        └──────┬────┬──┘   └──────┬────┬──────┘
+                               │    │             │    │
+                    ┌──────────▼─┐  └──────┐  ┌──┘  ┌─▼──────────┐
+                    │ PostgreSQL │         └──┘     │    Redis    │
+                    │   :5432    │                  │    :6379    │
+                    │  users     │  ◄── writes      │  redirects  │
+                    │  urls      │                  │  stats      │
+                    │  events    │                  │  url lookups│
+                    └────────────┘                  └─────────────┘
+```
+
+**Full diagram, data model, and request flows:** [docs/architecture.md](docs/architecture.md)
+
+---
+
+## Documentation Index
+
+| Document | Contents |
+|----------|---------|
+| [docs/architecture.md](docs/architecture.md) | System diagram, request flows, data model, port map, scaling model |
+| [docs/deploy.md](docs/deploy.md) | First deploy, routine deploy, rollback, scaling, post-deploy checklist |
+| [docs/configuration.md](docs/configuration.md) | All environment variables, GitHub Secrets, example `.env` files |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues, real bugs we hit + how we fixed them |
+| [docs/runbooks.md](docs/runbooks.md) | Step-by-step incident response for 7 alert types |
+| [docs/decisions.md](docs/decisions.md) | Why Flask, Peewee, PostgreSQL, Redis, Nginx, Docker Compose, Base62 |
+| [docs/capacity.md](docs/capacity.md) | Throughput benchmarks, hard limits, scaling path to internet scale |
+| [FAILURE_MODES.md](FAILURE_MODES.md) | 12 failure scenarios with user impact, auto-recovery, time-to-recover |
+
+---
+
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
