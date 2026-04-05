@@ -1,0 +1,10 @@
+# Local dev override: map nginx to port 8080 to avoid conflicts with
+# any process already bound to port 80 on your Mac.
+#
+# Usage:
+#   docker compose -f docker-compose.1gb.yml -f docker-compose.local.yml up --build
+
+services:
+  nginx:
+    ports:
+      - "8080:80"
