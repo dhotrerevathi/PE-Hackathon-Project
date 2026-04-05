@@ -57,6 +57,39 @@ class TestUrlListFilters:
         assert client.get("/api/urls?per_page=999").get_json()["per_page"] == 100
 
 
+class TestUrlUserFilter:
+    def test_filter_by_user_id(self, client, app):
+        user1 = _unique_user(app, "filter_u1")
+        user2 = _unique_user(app, "filter_u2")
+        client.post("/api/urls", json={"original_url": "https://user1.example.com", "user_id": user1.id})
+        client.post("/api/urls", json={"original_url": "https://user2.example.com", "user_id": user2.id})
+        r = client.get(f"/api/urls?user_id={user1.id}")
+        body = r.get_json()
+        assert body["total"] == 1
+        assert body["urls"][0]["user_id"] == user1.id
+
+    def test_filter_by_user_id_returns_all_for_that_user(self, client, app):
+        user = _unique_user(app, "multi_url_user")
+        for i in range(3):
+            client.post("/api/urls", json={"original_url": f"https://multi{i}.example.com", "user_id": user.id})
+        body = client.get(f"/api/urls?user_id={user.id}").get_json()
+        assert body["total"] == 3
+        assert all(u["user_id"] == user.id for u in body["urls"])
+
+    def test_nonexistent_user_id_in_create_returns_404(self, client):
+        r = client.post("/api/urls", json={"original_url": "https://example.com", "user_id": 999999})
+        assert r.status_code == 404
+
+    def test_invalid_url_format_rejected(self, client):
+        """The Deceitful Scroll: non-URL original_url must be rejected."""
+        r = client.post("/api/urls", json={"original_url": "not-a-url"})
+        assert r.status_code == 400
+
+    def test_plain_string_url_rejected(self, client):
+        r = client.post("/api/urls", json={"original_url": "just some text"})
+        assert r.status_code == 400
+
+
 class TestUrlCrudEdgeCases:
     def test_update_nonexistent_returns_404(self, client):
         assert client.put("/api/urls/999999", json={"title": "x"}).status_code == 404

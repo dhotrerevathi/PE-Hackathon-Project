@@ -1,6 +1,7 @@
 import json
 import secrets
 from datetime import datetime
+from urllib.parse import urlparse
 
 from flask import Blueprint, jsonify, redirect, request
 
@@ -117,6 +118,13 @@ def create_url():
     if not isinstance(original_url, str) or not original_url.strip():
         return jsonify(error="original_url is required"), 400
     original_url = original_url.strip()
+
+    try:
+        parsed = urlparse(original_url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError
+    except Exception:
+        return jsonify(error="original_url must be a valid http or https URL"), 400
 
     # Validate user_id if provided
     user_id = data.get("user_id")

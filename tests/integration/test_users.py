@@ -112,6 +112,46 @@ class TestCreateUser:
         assert r.status_code == 400
 
 
+class TestUpdateUser:
+    def test_update_username_returns_200(self, client, app):
+        user = _make_user(app)
+        r = client.put(f"/api/users/{user.id}", json={"username": "updated_user"})
+        assert r.status_code == 200
+        assert r.get_json()["username"] == "updated_user"
+
+    def test_update_email_returns_200(self, client, app):
+        user = _make_user(app)
+        r = client.put(f"/api/users/{user.id}", json={"email": "updated@example.com"})
+        assert r.status_code == 200
+        assert r.get_json()["email"] == "updated@example.com"
+
+    def test_update_preserves_other_fields(self, client, app):
+        user = _make_user(app)
+        r = client.put(f"/api/users/{user.id}", json={"username": "new_name"})
+        body = r.get_json()
+        assert body["email"] == "test@example.com"
+        assert body["id"] == user.id
+
+    def test_update_nonexistent_returns_404(self, client):
+        assert client.put("/api/users/999999", json={"username": "x"}).status_code == 404
+
+    def test_update_duplicate_username_returns_409(self, client, app):
+        _make_user(app, "first_user", "first@example.com")
+        user2 = _make_user(app, "second_user", "second@example.com")
+        r = client.put(f"/api/users/{user2.id}", json={"username": "first_user"})
+        assert r.status_code == 409
+
+    def test_update_invalid_email_returns_400(self, client, app):
+        user = _make_user(app)
+        r = client.put(f"/api/users/{user.id}", json={"email": "not-an-email"})
+        assert r.status_code == 400
+
+    def test_update_integer_username_returns_400(self, client, app):
+        user = _make_user(app)
+        r = client.put(f"/api/users/{user.id}", json={"username": 999})
+        assert r.status_code == 400
+
+
 class TestBulkCreateUsers:
     def test_bulk_import_csv(self, client):
         csv_data = "username,email\nbulkuser1,bulk1@example.com\nbulkuser2,bulk2@example.com\n"

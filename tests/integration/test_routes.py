@@ -115,6 +115,17 @@ class TestCreateUrl:
         r = client.post("/api/urls", data="original_url=https://example.com")
         assert r.status_code == 400
 
+    def test_deceitful_scroll_invalid_url_rejected(self, client):
+        """The Deceitful Scroll: original_url that is not a real URL must be rejected."""
+        r = client.post("/api/urls", json={"original_url": "not-a-real-url"})
+        assert r.status_code == 400
+
+    def test_create_url_missing_user_id_still_works(self, client):
+        """user_id is optional — creating without it should succeed."""
+        r = client.post("/api/urls", json={"original_url": "https://example.com/no-user"})
+        assert r.status_code == 201
+        assert r.get_json()["user_id"] is None
+
 
 class TestRedirect:
     def _create_url(self, client, app, original_url):
