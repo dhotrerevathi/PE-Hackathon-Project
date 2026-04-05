@@ -89,7 +89,13 @@ def create_app():
             "http_error",
             extra={"status": e.code, "error": e.name, "path": request.path},
         )
-        return jsonify({"error": e.name, "message": e.description}), e.code
+        # werkzeug exceptions have a 'description' attribute
+        return jsonify({"error": e.name, "message": getattr(e, "description", str(e))}), e.code
+
+    @app.errorhandler(405)
+    def handle_405(e):
+        """Specifically handles Method Not Allowed to return JSON."""
+        return jsonify({"error": "Method Not Allowed", "message": "The method is not allowed for the requested URL."}), 405
 
     @app.errorhandler(Exception)
     def handle_generic_exception(e):
