@@ -1,3 +1,5 @@
+import json
+
 from flask import Blueprint, jsonify, request
 
 from app.models.event import Event
@@ -6,17 +8,26 @@ events_bp = Blueprint("events", __name__)
 
 
 def _event_to_dict(event):
+    # Parse details from JSON string if stored as string
+    details = event.details
+    if isinstance(details, str):
+        try:
+            details = json.loads(details)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return {
         "id": event.id,
         "url_id": event.url_id,
         "user_id": event.user_id,
         "event_type": event.event_type,
         "timestamp": event.timestamp.isoformat() if event.timestamp else None,
-        "details": event.details,
+        "details": details,
     }
 
 
 @events_bp.route("/api/events", methods=["GET"])
+@events_bp.route("/events", methods=["GET"])
 def list_events():
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 100)

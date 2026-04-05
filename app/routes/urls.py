@@ -1,3 +1,4 @@
+import json
 import secrets
 from datetime import datetime
 
@@ -7,6 +8,7 @@ from app.cache import cache
 from app.database import db
 from app.models.event import Event
 from app.models.url import Url
+from app.models.user import User
 from app.utils import is_valid_custom_code, to_base62
 
 from prometheus_client import Counter
@@ -55,7 +57,7 @@ def redirect_url(short_code):
     # The Slumbering Guide: inactive URL returns 404 and logs NO event.
     if not target["is_active"]:
         return jsonify(error="URL is inactive"), 404
-    
+
     redirect_counter.labels(short_code=short_code).inc()
 
     Event.create(
@@ -69,6 +71,7 @@ def redirect_url(short_code):
 
 
 @urls_bp.route("/api/urls", methods=["GET"])
+@urls_bp.route("/urls", methods=["GET"])
 def list_urls():
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 100)
@@ -93,6 +96,7 @@ def list_urls():
 
 
 @urls_bp.route("/api/urls/<int:url_id>", methods=["GET"])
+@urls_bp.route("/urls/<int:url_id>", methods=["GET"])
 @cache.memoize(timeout=60)
 def get_url(url_id):
     url = Url.get_or_none(Url.id == url_id)
@@ -102,6 +106,7 @@ def get_url(url_id):
 
 
 @urls_bp.route("/api/urls", methods=["POST"])
+@urls_bp.route("/urls", methods=["POST"])
 def create_url():
     # The Fractured Vessel: must be a JSON object, not a string or array.
     data = request.get_json(silent=True)
@@ -112,6 +117,15 @@ def create_url():
     if not isinstance(original_url, str) or not original_url.strip():
         return jsonify(error="original_url is required"), 400
     original_url = original_url.strip()
+
+    # Validate user_id if provided
+    user_id = data.get("user_id")
+    if user_id is not None:
+        if not isinstance(user_id, int):
+            return jsonify(error="user_id must be an integer"), 400
+        user = User.get_or_none(User.id == user_id)
+        if user is None:
+            return jsonify(error="User not found"), 404
 
     custom_code = data.get("short_code", "")
     if custom_code:
@@ -126,7 +140,7 @@ def create_url():
     with db.atomic():
         # The Twin's Paradox: every creation gets its own distinct short code.
         url = Url.create(
-            user_id=data.get("user_id"),
+            user_id=user_id,
             short_code=f"__pending_{secrets.token_hex(4)}",
             original_url=original_url,
             title=data.get("title"),
@@ -137,18 +151,25 @@ def create_url():
         url.short_code = custom_code or to_base62(url.id)
         url.save()
 
+    # Store event details as JSON string with short_code and original_url
+    event_details = json.dumps({
+        "short_code": url.short_code,
+        "original_url": url.original_url,
+    })
+
     Event.create(
         url=url,
-        user_id=data.get("user_id"),
+        user_id=user_id,
         event_type="created",
         timestamp=now,
-        details=None,
+        details=event_details,
     )
 
     return jsonify(_url_to_dict(url)), 201
 
 
 @urls_bp.route("/api/urls/<int:url_id>", methods=["PUT"])
+@urls_bp.route("/urls/<int:url_id>", methods=["PUT"])
 def update_url(url_id):
     url = Url.get_or_none(Url.id == url_id)
     if url is None:
@@ -171,6 +192,7 @@ def update_url(url_id):
 
 
 @urls_bp.route("/api/urls/<int:url_id>", methods=["DELETE"])
+@urls_bp.route("/urls/<int:url_id>", methods=["DELETE"])
 def delete_url(url_id):
     url = Url.get_or_none(Url.id == url_id)
     if url is None:
@@ -186,6 +208,7 @@ def delete_url(url_id):
 
 
 @urls_bp.route("/api/urls/<int:url_id>/stats", methods=["GET"])
+@urls_bp.route("/urls/<int:url_id>/stats", methods=["GET"])
 def url_stats(url_id):
     url = Url.get_or_none(Url.id == url_id)
     if url is None:

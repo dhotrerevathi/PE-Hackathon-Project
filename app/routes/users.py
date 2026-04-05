@@ -24,6 +24,7 @@ def _user_to_dict(user):
 
 
 @users_bp.route("/api/users", methods=["GET"])
+@users_bp.route("/users", methods=["GET"])
 def list_users():
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 100)
@@ -40,6 +41,7 @@ def list_users():
 
 
 @users_bp.route("/api/users/<int:user_id>", methods=["GET"])
+@users_bp.route("/users/<int:user_id>", methods=["GET"])
 def get_user(user_id):
     user = User.get_or_none(User.id == user_id)
     if user is None:
@@ -62,6 +64,7 @@ def get_user(user_id):
 
 
 @users_bp.route("/api/users", methods=["POST"])
+@users_bp.route("/users", methods=["POST"])
 def create_user():
     # The Fractured Vessel: must be a JSON object
     data = request.get_json(silent=True)
@@ -92,7 +95,47 @@ def create_user():
     return jsonify(_user_to_dict(user)), 201
 
 
+@users_bp.route("/api/users/<int:user_id>", methods=["PUT"])
+@users_bp.route("/users/<int:user_id>", methods=["PUT"])
+def update_user(user_id):
+    user = User.get_or_none(User.id == user_id)
+    if user is None:
+        return jsonify(error="User not found"), 404
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Request body must be a JSON object"), 400
+
+    if "username" in data:
+        username = data["username"]
+        if not isinstance(username, str) or not username.strip():
+            return jsonify(error="username must be a non-empty string"), 400
+        username = username.strip()
+        # Check for duplicate username (excluding current user)
+        existing = User.get_or_none(User.username == username)
+        if existing and existing.id != user.id:
+            return jsonify(error="username already taken"), 409
+        user.username = username
+
+    if "email" in data:
+        email = data["email"]
+        if not isinstance(email, str) or not email.strip():
+            return jsonify(error="email must be a non-empty string"), 400
+        email = email.strip()
+        if not _EMAIL_RE.match(email):
+            return jsonify(error="email is invalid"), 400
+        # Check for duplicate email (excluding current user)
+        existing = User.get_or_none(User.email == email)
+        if existing and existing.id != user.id:
+            return jsonify(error="email already registered"), 409
+        user.email = email
+
+    user.save()
+    return jsonify(_user_to_dict(user))
+
+
 @users_bp.route("/api/users/bulk", methods=["POST"])
+@users_bp.route("/users/bulk", methods=["POST"])
 def bulk_create_users():
     """Bulk import users from a CSV file (multipart/form-data, field: file)."""
     if "file" not in request.files:
