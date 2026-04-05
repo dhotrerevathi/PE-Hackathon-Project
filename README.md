@@ -164,7 +164,7 @@ All endpoints respond in JSON. All error responses are clean JSON objects — no
 
 ---
 
-## Reliability Quest — Evidence
+## Reliability Quest — Evidence (Target: Gold 🥇)
 
 ### 🥉 Tier 1: Bronze — The Shield
 
@@ -760,7 +760,7 @@ See [FAILURE_MODES.md](FAILURE_MODES.md) for the complete failure mode reference
 
 ---
 
-## Incident Response Quest — Evidence
+## Incident Response Quest — Evidence (Target: Silver 🥈)
 
 ### Bronze: Structured Logging + Metrics Endpoint
 
