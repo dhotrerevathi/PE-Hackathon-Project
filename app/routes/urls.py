@@ -77,12 +77,14 @@ def list_urls():
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 100)
     user_id = request.args.get("user_id", type=int)
-    active_only = request.args.get("active", "").lower() == "true"
+    # Support both "is_active" and "active" query parameters
+    filter_active = request.args.get("is_active") or request.args.get("active")
+    should_filter_active = filter_active and filter_active.lower() == "true"
 
     query = Url.select()
     if user_id is not None:
         query = query.where(Url.user == user_id)
-    if active_only:
+    if should_filter_active:
         query = query.where(Url.is_active)
 
     total = query.count()
