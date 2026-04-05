@@ -134,6 +134,17 @@ def update_user(user_id):
     return jsonify(_user_to_dict(user))
 
 
+@users_bp.route("/api/users/<int:user_id>", methods=["DELETE"])
+@users_bp.route("/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    user = User.get_or_none(User.id == user_id)
+    if user is None:
+        return jsonify(error="User not found"), 404
+
+    user.delete_instance(recursive=True)
+    return jsonify(message="User deleted"), 200
+
+
 @users_bp.route("/api/users/bulk", methods=["POST"])
 @users_bp.route("/users/bulk", methods=["POST"])
 def bulk_create_users():
