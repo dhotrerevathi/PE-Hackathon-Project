@@ -15,7 +15,9 @@ def create_dummy_user():
     user = User.get_or_none(User.username == "dummy")
     if not user:
         user = User.create(
-            username="dummy", email="dummy@example.com", created_at=datetime.utcnow()
+            username="dummy",
+            email="dummy@example.com",
+            created_at=datetime.utcnow(),
         )
     return user.id
 
@@ -127,7 +129,9 @@ class TestUrlCrudEdgeCases:
     def test_create_with_user_id(self, client, app):
         with app.app_context():
             user = User.create(
-                username="urlowner", email="o@example.com", created_at=datetime.utcnow()
+                username="urlowner",
+                email="o@example.com",
+                created_at=datetime.utcnow(),
             )
         r = client.post(
             "/urls",
@@ -170,7 +174,10 @@ class TestStatsDetailed:
     def test_total_events_counted(self, client):
         r = client.post(
             "/urls",
-            json={"original_url": "https://ev.example.com", "user_id": create_dummy_user()},
+            json={
+                "original_url": "https://ev.example.com",
+                "user_id": create_dummy_user(),
+            },
         )
         code = r.get_json()["short_code"]
         client.get(f"/{code}")
