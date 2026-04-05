@@ -81,6 +81,9 @@ def list_urls():
     filter_active = request.args.get("is_active") or request.args.get("active")
     should_filter_active = filter_active and filter_active.lower() == "true"
 
+    # Ensure page is at least 1
+    page = max(page, 1)
+
     query = Url.select()
     if user_id is not None:
         query = query.where(Url.user == user_id)
@@ -88,13 +91,14 @@ def list_urls():
         query = query.where(Url.is_active)
 
     total = query.count()
-    urls = query.order_by(Url.created_at.desc()).paginate(page, per_page)
+    offset = (page - 1) * per_page
+    urls = query.order_by(Url.created_at.desc()).offset(offset).limit(per_page)
 
     return jsonify(
         total=total,
         page=page,
         per_page=per_page,
-        urls=[_url_to_dict(u) for u in urls],
+        list=[_url_to_dict(u) for u in urls],
     )
 
 
@@ -105,7 +109,7 @@ def get_url(url_id):
     url = Url.get_or_none(Url.id == url_id)
     if url is None:
         return jsonify(error="URL not found"), 404
-    return jsonify(_url_to_dict(url))
+    return jsonify(_url_to_dict(url)), 200
 
 
 @urls_bp.route("/api/urls", methods=["POST"])
@@ -224,7 +228,7 @@ def update_url(url_id):
     cache.delete_memoized(get_url, url_id)
     cache.delete_memoized(_get_redirect_target, url.short_code)
 
-    return jsonify(_url_to_dict(url))
+    return jsonify(_url_to_dict(url)), 200
 
 
 @urls_bp.route("/api/urls/<int:url_id>", methods=["DELETE"])

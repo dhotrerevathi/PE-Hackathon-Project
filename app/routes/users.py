@@ -29,14 +29,18 @@ def list_users():
     page = request.args.get("page", 1, type=int)
     per_page = min(request.args.get("per_page", 20, type=int), 100)
 
+    # Ensure page is at least 1
+    page = max(page, 1)
+
     total = User.select().count()
-    users = User.select().order_by(User.created_at.desc()).paginate(page, per_page)
+    offset = (page - 1) * per_page
+    users = User.select().order_by(User.created_at.desc()).offset(offset).limit(per_page)
 
     return jsonify(
         total=total,
         page=page,
         per_page=per_page,
-        users=[_user_to_dict(u) for u in users],
+        list=[_user_to_dict(u) for u in users],
     )
 
 
@@ -47,7 +51,7 @@ def get_user(user_id):
     if user is None:
         return jsonify(error="User not found"), 404
 
-    urls = Url.select().where(Url.user == user).order_by(Url.created_at.desc())
+    urls = Url.select().where(Url.user == user_id).order_by(Url.created_at.desc())
 
     result = _user_to_dict(user)
     result["urls"] = [
@@ -131,7 +135,7 @@ def update_user(user_id):
         user.email = email
 
     user.save()
-    return jsonify(_user_to_dict(user))
+    return jsonify(_user_to_dict(user)), 200
 
 
 @users_bp.route("/api/users/<int:user_id>", methods=["DELETE"])
@@ -148,19 +152,53 @@ def delete_user(user_id):
 @users_bp.route("/api/users/bulk", methods=["POST"])
 @users_bp.route("/users/bulk", methods=["POST"])
 def bulk_create_users():
-    """Bulk import users from a CSV file (multipart/form-data, field: file)."""
-    if "file" not in request.files:
-        return jsonify(error="multipart field 'file' is required"), 400
+    """Bulk import users from a CSV file.
 
-    file = request.files["file"]
-    if not file.filename:
-        return jsonify(error="No file selected"), 400
+    Accepts either:
+    1. JSON: {"file": "users.csv", "row_count": 400}
+    2. Multipart: form data with "file" field
+    """
+    import os
+    content = None
 
-    try:
-        content = file.read().decode("utf-8")
-    except Exception:
-        return jsonify(error="Could not decode file as UTF-8"), 400
+    # Try JSON input first
+    data = request.get_json(silent=True)
+    if isinstance(data, dict) and "file" in data:
+        filename = data.get("file")
 
+        # Try multiple paths
+        search_paths = [
+            filename,  # Try as-is
+            os.path.join(os.getcwd(), filename),  # Relative to CWD
+            os.path.join(os.path.dirname(__file__), "..", "..", filename),  # Project root
+        ]
+
+        for path in search_paths:
+            try:
+                if os.path.exists(path):
+                    with open(path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    break
+            except Exception:
+                continue
+
+        if content is None:
+            return jsonify(error=f"Could not read CSV file: {filename}"), 400
+
+    # Fall back to multipart file upload
+    elif "file" in request.files:
+        file = request.files["file"]
+        if not file.filename:
+            return jsonify(error="No file selected"), 400
+        try:
+            content = file.read().decode("utf-8")
+        except Exception:
+            return jsonify(error="Could not decode file as UTF-8"), 400
+
+    else:
+        return jsonify(error="multipart field 'file' or JSON 'file' is required"), 400
+
+    # Parse CSV
     reader = csv.DictReader(io.StringIO(content))
     if reader.fieldnames is None or not {"username", "email"}.issubset(
         {f.strip() for f in reader.fieldnames}
