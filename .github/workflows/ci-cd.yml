@@ -5,6 +5,7 @@ name: CI / CD
 on:
   push:
     branches: [main]
+  workflow_dispatch:   # Enables "Run workflow" button in the GitHub Actions UI
 
 # Cancel any in-progress run for the same branch
 concurrency:
