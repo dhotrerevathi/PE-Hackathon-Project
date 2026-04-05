@@ -12,6 +12,7 @@
       "targets": [
         {
           "expr": "sum(rate(flask_http_request_total[1m])) by (status)",
+          "expr": "sum(rate(flask_http_request_duration_seconds_count[5m])) by (status)",
           "legendFormat": "HTTP {{status}}"
         }
       ]
@@ -23,6 +24,7 @@
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(flask_http_request_duration_seconds_bucket[1m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "p95 Latency (Seconds)"
         }
       ]
@@ -34,6 +36,7 @@
       "targets": [
         {
           "expr": "(sum(rate(flask_http_request_total{status=~\"5..\"}[1m])) / sum(rate(flask_http_request_total[1m]))) * 100",
+          "expr": "(sum(rate(flask_http_request_duration_seconds_count{status=~\"5..\"}[5m])) / sum(rate(flask_http_request_duration_seconds_count[5m]))) * 100",
           "legendFormat": "Error Rate %"
         }
       ]
@@ -45,6 +48,7 @@
       "targets": [
         {
           "expr": "process_resident_memory_bytes{job=\"flask-app\"}",
+          "expr": "sum(process_resident_memory_bytes{job=\"flask-app\"})",
           "legendFormat": "App RSS Memory (Bytes)"
         }
       ],

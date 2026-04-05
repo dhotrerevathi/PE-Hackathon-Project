@@ -20,9 +20,9 @@ groups:
       - alert: HighErrorRate
         expr: >
           (
-            rate(flask_http_request_total{status=~"5.."}[5m])
+            rate(flask_http_request_duration_seconds_count{status=~"5.."}[5m])
             /
-            rate(flask_http_request_total[5m])
+            rate(flask_http_request_duration_seconds_count[5m])
           ) > 0.05
         for: 2m
         labels:
