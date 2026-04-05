@@ -149,6 +149,10 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=hackathon
       - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./monitoring/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards/data:ro
     depends_on:
       - prometheus
 
