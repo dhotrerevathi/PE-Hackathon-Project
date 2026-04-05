@@ -116,27 +116,44 @@ jobs:
             # ── Pull latest code (compose files, nginx config, etc.) ─────
             if [ ! -d .git ]; then
               git clone https://github.com/${{ github.repository }}.git .
-            else
-              git fetch origin main
-              git reset --hard origin/main
             fi
+            git fetch origin
+            git reset --hard origin/${{ github.ref_name }}
 
             # ── Write .env from secrets (never committed to repo) ─────────
             # Rotate this file on every deploy so stale secrets don't linger.
-            cat > .env << 'ENVEOF'
-            SECRET_KEY=${{ secrets.SECRET_KEY }}
-            DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
-            DATABASE_NAME=hackathon_db
-            DATABASE_HOST=db
-            DATABASE_PORT=5432
-            DATABASE_USER=postgres
-            DATABASE_READ_HOST=
-            REDIS_URL=redis://redis:6379/0
-            PORT=5000
-            GUNICORN_WORKERS=${{ secrets.GUNICORN_WORKERS || '2' }}
-            APP_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }}
-            ENVEOF
+            DB_PASS="${{ secrets.DATABASE_PASSWORD }}"
+            DB_PASS="${DB_PASS:-postgres}"          # fall back to 'postgres' if secret is unset
+
+            cat > .env << ENVEOF
+SECRET_KEY=${{ secrets.SECRET_KEY }}
+DATABASE_PASSWORD=${DB_PASS}
+DATABASE_NAME=hackathon_db
+DATABASE_HOST=db
+DATABASE_PORT=5432
+DATABASE_USER=postgres
+DATABASE_READ_HOST=
+REDIS_URL=redis://redis:6379/0
+PORT=5000
+GUNICORN_WORKERS=2
+APP_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }}
+ENVEOF
             chmod 600 .env
+
+            # ── DB credential recovery ────────────────────────────────────
+            # If the postgres volume was initialized with a different password,
+            # authentication will fail. Detect this and reset the volume so a
+            # fresh DB is created with the correct password.
+            if docker compose -f docker-compose.1gb.yml ps db 2>/dev/null | grep -q "running"; then
+              if ! docker compose -f docker-compose.1gb.yml exec -T db \
+                  psql -U postgres -d hackathon_db -c "SELECT 1;" > /dev/null 2>&1; then
+                echo "DB credential mismatch detected — resetting postgres volume for fresh init."
+                docker compose -f docker-compose.1gb.yml stop db || true
+                docker compose -f docker-compose.1gb.yml rm -f db || true
+                docker volume rm urlshortener_postgres_data 2>/dev/null || true
+                echo "Volume cleared — PostgreSQL will reinitialise with the current password."
+              fi
+            fi
 
             # ── Log in to GHCR on the server ─────────────────────────────
             echo "${{ secrets.GITHUB_TOKEN }}" | \
