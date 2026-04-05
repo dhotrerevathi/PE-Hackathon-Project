@@ -1,4 +1,4 @@
-from flask import Blueprint, redirect, jsonify, request
+from flask import Blueprint, jsonify, request
 from playhouse.shortcuts import model_to_dict
 
 from app.models.event import Event
