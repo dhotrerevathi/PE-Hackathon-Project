@@ -760,7 +760,7 @@ See [FAILURE_MODES.md](FAILURE_MODES.md) for the complete failure mode reference
 
 ---
 
-## Incident Response Quest — Evidence (Target: Silver 🥈)
+## Incident Response Quest — Evidence (Target: Gold 🥇)
 
 ### Bronze: Structured Logging + Metrics Endpoint
 
