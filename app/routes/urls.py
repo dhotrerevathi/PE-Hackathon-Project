@@ -127,14 +127,28 @@ def create_url():
         if user is None:
             return jsonify(error="User not found"), 404
 
-    custom_code = data.get("short_code", "")
+    custom_code = data.get("short_code")
+    if custom_code is not None:
+        if not isinstance(custom_code, str):
+            return jsonify(error="short_code must be a string"), 400
+        custom_code = custom_code.strip()
+    else:
+        custom_code = ""
+
     if custom_code:
-        custom_code = str(custom_code).strip()
         ok, err = is_valid_custom_code(custom_code)
         if not ok:
             return jsonify(error=err), 400
         if Url.select().where(Url.short_code == custom_code).exists():
             return jsonify(error="short_code already taken"), 409
+
+    title = data.get("title")
+    if title is not None and not isinstance(title, str):
+        return jsonify(error="title must be a string"), 400
+
+    is_active = data.get("is_active", True)
+    if not isinstance(is_active, bool):
+        return jsonify(error="is_active must be a boolean"), 400
 
     now = datetime.utcnow()
     with db.atomic():
@@ -143,8 +157,8 @@ def create_url():
             user_id=user_id,
             short_code=f"__pending_{secrets.token_hex(4)}",
             original_url=original_url,
-            title=data.get("title"),
-            is_active=data.get("is_active", True),
+            title=title,
+            is_active=is_active,
             created_at=now,
             updated_at=now,
         )
@@ -175,13 +189,25 @@ def update_url(url_id):
     if url is None:
         return jsonify(error="URL not found"), 404
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(error="Request body must be a JSON object"), 400
+
     if "original_url" in data:
-        url.original_url = data["original_url"]
+        original_url = data["original_url"]
+        if not isinstance(original_url, str) or not original_url.strip():
+            return jsonify(error="original_url must be a non-empty string"), 400
+        url.original_url = original_url.strip()
     if "title" in data:
-        url.title = data["title"]
+        title = data["title"]
+        if title is not None and not isinstance(title, str):
+            return jsonify(error="title must be a string"), 400
+        url.title = title
     if "is_active" in data:
-        url.is_active = bool(data["is_active"])
+        is_active = data["is_active"]
+        if not isinstance(is_active, bool):
+            return jsonify(error="is_active must be a boolean"), 400
+        url.is_active = is_active
     url.updated_at = datetime.utcnow()
     url.save()
 
